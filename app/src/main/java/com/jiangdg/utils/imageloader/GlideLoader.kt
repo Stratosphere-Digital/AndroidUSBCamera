@@ -41,180 +41,186 @@ import com.bumptech.glide.request.target.Target
 import com.jiangdg.demo.R
 import java.lang.IllegalArgumentException
 
-/**GlideImageLoader by glide
+/**
+ * GlideImageLoader by glide
  *
  * @param target imageview owner
- *
  * @author Created by jiangdg on 2022/3/16
  */
 class GlideLoader<T>(target: T) : ILoader<ImageView> {
-    private var mRequestManager: RequestManager? = null
+  private var mRequestManager: RequestManager? = null
 
-    init {
-        mRequestManager = when (target) {
-            is Fragment -> Glide.with(target)
-            is FragmentActivity -> Glide.with(target)
-            is Activity -> Glide.with(target)
-            is Context -> Glide.with(target)
-            is View -> Glide.with(target)
-            else -> throw IllegalArgumentException()
+  init {
+    mRequestManager =
+        when (target) {
+          is Fragment -> Glide.with(target)
+          is FragmentActivity -> Glide.with(target)
+          is Activity -> Glide.with(target)
+          is Context -> Glide.with(target)
+          is View -> Glide.with(target)
+          else -> throw IllegalArgumentException()
         }
-    }
+  }
 
-    override fun load(imageView: ImageView, url: String?, placeHolder: Int) {
-        val centerCrop: Transformation<Bitmap> = CenterCrop()
-        mRequestManager!!.load(url).optionalTransform(centerCrop)
-            .optionalTransform(WebpDrawable::class.java, WebpDrawableTransformation(centerCrop))
-            .placeholder(placeHolder)
-            .into(imageView)
-    }
+  override fun load(imageView: ImageView, url: String?, placeHolder: Int) {
+    val centerCrop: Transformation<Bitmap> = CenterCrop()
+    mRequestManager!!
+        .load(url)
+        .optionalTransform(centerCrop)
+        .optionalTransform(WebpDrawable::class.java, WebpDrawableTransformation(centerCrop))
+        .placeholder(placeHolder)
+        .into(imageView)
+  }
 
-    override fun load(imageView: ImageView, url: String?) {
-        val centerCrop: Transformation<Bitmap> = CenterCrop()
-        mRequestManager!!.load(url).optionalTransform(centerCrop)
-            .optionalTransform(WebpDrawable::class.java, WebpDrawableTransformation(centerCrop))
-            .placeholder(R.drawable.imageloader_default_cover_bg)
-            .into(imageView)
-    }
+  override fun load(imageView: ImageView, url: String?) {
+    val centerCrop: Transformation<Bitmap> = CenterCrop()
+    mRequestManager!!
+        .load(url)
+        .optionalTransform(centerCrop)
+        .optionalTransform(WebpDrawable::class.java, WebpDrawableTransformation(centerCrop))
+        .placeholder(R.drawable.imageloader_default_cover_bg)
+        .into(imageView)
+  }
 
-    override fun load(imageView: ImageView, resId: Int) {
-        val centerCrop: Transformation<Bitmap> = CenterCrop()
-        mRequestManager!!.load(resId).optionalTransform(centerCrop)
-            .optionalTransform(WebpDrawable::class.java, WebpDrawableTransformation(centerCrop))
-            .placeholder(R.drawable.imageloader_default_cover_bg)
-            .into(imageView)
-    }
+  override fun load(imageView: ImageView, resId: Int) {
+    val centerCrop: Transformation<Bitmap> = CenterCrop()
+    mRequestManager!!
+        .load(resId)
+        .optionalTransform(centerCrop)
+        .optionalTransform(WebpDrawable::class.java, WebpDrawableTransformation(centerCrop))
+        .placeholder(R.drawable.imageloader_default_cover_bg)
+        .into(imageView)
+  }
 
-    override fun load(
-        imageView: ImageView,
-        url: String?,
-        placeHolder: Int,
-        bitmapTransformation: BitmapTransformation?
-    ) {
-        mRequestManager!!.load(url).optionalTransform(bitmapTransformation!!)
-            .optionalTransform(
-                WebpDrawable::class.java,
-                WebpDrawableTransformation(bitmapTransformation)
-            )
-            .placeholder(placeHolder).into(imageView)
-    }
+  override fun load(
+      imageView: ImageView,
+      url: String?,
+      placeHolder: Int,
+      bitmapTransformation: BitmapTransformation?
+  ) {
+    mRequestManager!!
+        .load(url)
+        .optionalTransform(bitmapTransformation!!)
+        .optionalTransform(
+            WebpDrawable::class.java, WebpDrawableTransformation(bitmapTransformation))
+        .placeholder(placeHolder)
+        .into(imageView)
+  }
 
-    @SuppressLint("CheckResult")
-    override fun loadRounded(imageView: ImageView, url: String?, placeHolder: Int, radius: Float) {
-        RequestOptions().apply {
-            if (radius >= 0) {
-                transform(CenterCrop(), RoundedCorners(dp2px(imageView.context, radius)))
-            } else {
-                transform(RoundedCorners(dp2px(imageView.context, radius)))
-            }
-        }.also { options ->
-            mRequestManager!!.load(url)
-                .placeholder(placeHolder)
-                .apply(options)
-                .into(imageView)
+  @SuppressLint("CheckResult")
+  override fun loadRounded(imageView: ImageView, url: String?, placeHolder: Int, radius: Float) {
+    RequestOptions()
+        .apply {
+          if (radius >= 0) {
+            transform(CenterCrop(), RoundedCorners(dp2px(imageView.context, radius)))
+          } else {
+            transform(RoundedCorners(dp2px(imageView.context, radius)))
+          }
         }
-    }
-
-    @SuppressLint("CheckResult")
-    override fun loadRounded(
-        imageView: ImageView,
-        url: String?,
-        placeHolder: Drawable?,
-        radius: Float
-    ) {
-        RequestOptions().apply {
-            if (radius >= 0) {
-                transform(CenterCrop(), RoundedCorners(dp2px(imageView.context, radius)))
-            } else {
-                transform(RoundedCorners(dp2px(imageView.context, radius)))
-            }
-        }.also { options ->
-            mRequestManager!!.load(url)
-                .placeholder(placeHolder)
-                .apply(options)
-                .into(imageView)
+        .also { options ->
+          mRequestManager!!.load(url).placeholder(placeHolder).apply(options).into(imageView)
         }
-    }
+  }
 
-    override fun loadRounded(imageView: ImageView, url: String?, radius: Float) {
-        loadRounded(imageView, url, R.drawable.imageloader_default_cover_bg, radius)
-    }
-
-    override fun loadCircle(imageView: ImageView, url: String?, placeHolder: Int) {
-        mRequestManager?.apply {
-            this.load(url)
-                .placeholder(placeHolder)
-                .apply(RequestOptions.bitmapTransform(CircleCrop()))
-                .into(imageView)
+  @SuppressLint("CheckResult")
+  override fun loadRounded(
+      imageView: ImageView,
+      url: String?,
+      placeHolder: Drawable?,
+      radius: Float
+  ) {
+    RequestOptions()
+        .apply {
+          if (radius >= 0) {
+            transform(CenterCrop(), RoundedCorners(dp2px(imageView.context, radius)))
+          } else {
+            transform(RoundedCorners(dp2px(imageView.context, radius)))
+          }
         }
-    }
-
-    override fun loadCircle(imageView: ImageView, url: String?) {
-        mRequestManager?.apply {
-            this.load(url)
-                .placeholder(R.drawable.imageloader_default_cover_bg)
-                .apply(RequestOptions.bitmapTransform(CircleCrop()))
-                .into(imageView)
+        .also { options ->
+          mRequestManager!!.load(url).placeholder(placeHolder).apply(options).into(imageView)
         }
+  }
+
+  override fun loadRounded(imageView: ImageView, url: String?, radius: Float) {
+    loadRounded(imageView, url, R.drawable.imageloader_default_cover_bg, radius)
+  }
+
+  override fun loadCircle(imageView: ImageView, url: String?, placeHolder: Int) {
+    mRequestManager?.apply {
+      this.load(url)
+          .placeholder(placeHolder)
+          .apply(RequestOptions.bitmapTransform(CircleCrop()))
+          .into(imageView)
     }
+  }
 
-    override fun loadCircle(imageView: ImageView, resId: Int, placeHolder: Int) {
-        mRequestManager?.apply {
-            this.load(resId)
-                .placeholder(placeHolder)
-                .apply(RequestOptions.bitmapTransform(CircleCrop()))
-                .into(imageView)
-        }
+  override fun loadCircle(imageView: ImageView, url: String?) {
+    mRequestManager?.apply {
+      this.load(url)
+          .placeholder(R.drawable.imageloader_default_cover_bg)
+          .apply(RequestOptions.bitmapTransform(CircleCrop()))
+          .into(imageView)
     }
+  }
 
-    override fun loadCircle(imageView: ImageView, resId: Int) {
-        mRequestManager?.apply {
-            this.load(resId)
-                .placeholder(R.drawable.imageloader_default_cover_bg)
-                .apply(RequestOptions.bitmapTransform(CircleCrop()))
-                .into(imageView)
-        }
+  override fun loadCircle(imageView: ImageView, resId: Int, placeHolder: Int) {
+    mRequestManager?.apply {
+      this.load(resId)
+          .placeholder(placeHolder)
+          .apply(RequestOptions.bitmapTransform(CircleCrop()))
+          .into(imageView)
     }
+  }
 
-    override fun loadAsBitmap(
-        url: String?,
-        width: Int,
-        height: Int,
-        listener: ILoader.OnLoadedResultListener
-    ) {
-        mRequestManager?.apply {
-            this.asBitmap()
-                .centerCrop()
-                .load(url)
-                .listener(object : RequestListener<Bitmap> {
-                    override fun onLoadFailed(
-                        e: GlideException?,
-                        model: Any?,
-                        target: Target<Bitmap>?,
-                        isFirstResource: Boolean
-                    ): Boolean {
-                        listener.onLoadedFailed(e)
-                        return true
-                    }
-
-                    override fun onResourceReady(
-                        resource: Bitmap?,
-                        model: Any?,
-                        target: Target<Bitmap>?,
-                        dataSource: DataSource?,
-                        isFirstResource: Boolean
-                    ): Boolean {
-                        listener.onLoadedSuccess(resource)
-                        return true
-                    }
-
-                })
-                .submit(width, height)
-        }
+  override fun loadCircle(imageView: ImageView, resId: Int) {
+    mRequestManager?.apply {
+      this.load(resId)
+          .placeholder(R.drawable.imageloader_default_cover_bg)
+          .apply(RequestOptions.bitmapTransform(CircleCrop()))
+          .into(imageView)
     }
+  }
 
-    private fun dp2px(context: Context, dpValue: Float): Int {
-        val scale: Float = context.resources.displayMetrics.density
-        return (dpValue * scale + 0.5f).toInt()
+  override fun loadAsBitmap(
+      url: String?,
+      width: Int,
+      height: Int,
+      listener: ILoader.OnLoadedResultListener
+  ) {
+    mRequestManager?.apply {
+      this.asBitmap()
+          .centerCrop()
+          .load(url)
+          .listener(
+              object : RequestListener<Bitmap> {
+                override fun onLoadFailed(
+                    e: GlideException?,
+                    model: Any?,
+                    target: Target<Bitmap>,
+                    isFirstResource: Boolean
+                ): Boolean {
+                  listener.onLoadedFailed(e)
+                  return true
+                }
+
+                override fun onResourceReady(
+                    resource: Bitmap,
+                    model: Any,
+                    target: Target<Bitmap>,
+                    dataSource: DataSource,
+                    isFirstResource: Boolean
+                ): Boolean {
+                  listener.onLoadedSuccess(resource)
+                  return true
+                }
+              })
+          .submit(width, height)
     }
+  }
+
+  private fun dp2px(context: Context, dpValue: Float): Int {
+    val scale: Float = context.resources.displayMetrics.density
+    return (dpValue * scale + 0.5f).toInt()
+  }
 }
