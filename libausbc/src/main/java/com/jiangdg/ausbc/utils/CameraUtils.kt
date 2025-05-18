@@ -115,6 +115,10 @@ object CameraUtils {
     }
 
     fun hasStoragePermission(ctx: Context): Boolean{
+        // For Android 10+ we don't need this permission for app-specific directories
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return true
+        }
         val locPermission = ContextCompat.checkSelfPermission(ctx, Manifest.permission.WRITE_EXTERNAL_STORAGE)
         return locPermission == PackageManager.PERMISSION_GRANTED
     }
