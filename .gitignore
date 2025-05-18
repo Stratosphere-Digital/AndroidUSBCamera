@@ -12,3 +12,4 @@
 .cxx/
 .vscode
 libuvc/src/main/libs/**/*.so
+set-java.sh
