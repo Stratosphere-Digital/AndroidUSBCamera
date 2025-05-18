@@ -10,7 +10,6 @@ version = '4.0.0'
 
 android {
 	compileSdkVersion rootProject.ext.versionCompiler
-	// buildToolsVersion rootProject.ext.versionBuildTool
 
 	compileOptions {
 		sourceCompatibility rootProject.ext.javaSourceCompatibility
