@@ -45,6 +45,7 @@ android {
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
     implementation "androidx.appcompat:appcompat:${androidXVersion}"
     implementation "androidx.core:core-ktx:${kotlinCoreVersion}"
     implementation "com.google.android.material:material:${materialVersion}"
@@ -59,15 +60,31 @@ dependencies {
     implementation "com.tencent.bugly:crashreport:$bugly_version"
     implementation "com.tencent.bugly:nativecrashreport:$bugly_native_version"
 
-    api 'com.gyf.immersionbar:immersionbar:3.0.0'
+    api 'com.geyifeng.immersionbar:immersionbar:3.2.2'
+    // 3.0.0
+
     implementation "com.github.bumptech.glide:glide:4.10.0"
     implementation "com.github.bumptech.glide:okhttp3-integration:4.10.0"
-    implementation "com.zlc.glide:webpdecoder:1.6.4.9.0"
+
+    implementation "com.github.zjupure:webpdecoder:2.7.4.16.0"
+    implementation "com.github.bumptech.glide:glide:4.16.0"
+    annotationProcessor "com.github.bumptech.glide:compiler:4.16.0"
+
     implementation 'com.tencent:mmkv:1.2.12'
 
     // For debug online
     implementation project(':libausbc')
 
+    testImplementation "junit:junit:4.13.2"
+    androidTestImplementation 'androidx.test:core:1.5.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+
     // demo
 //    implementation 'com.github.jiangdongguo.AndroidUSBCamera:libausbc:3.3.3'
+}
+
+android {
+    ndkVersion "25.1.8937393"
 }
