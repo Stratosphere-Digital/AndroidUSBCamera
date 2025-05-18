@@ -4,6 +4,9 @@ plugins {
     id 'maven-publish'
 }
 
+group = 'digital.stratosphere.callacamera'
+version = '4.0.0'
+
 android {
     compileSdkVersion 31
 

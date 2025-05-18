@@ -5,6 +5,9 @@ plugins {
 
 import org.apache.tools.ant.taskdefs.condition.Os
 
+group = 'digital.stratosphere.callacamera'
+version = '4.0.0'
+
 android {
 	compileSdkVersion rootProject.ext.versionCompiler
 	// buildToolsVersion rootProject.ext.versionBuildTool
