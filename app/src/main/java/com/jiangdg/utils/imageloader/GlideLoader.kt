@@ -224,3 +224,4 @@ class GlideLoader<T>(target: T) : ILoader<ImageView> {
     return (dpValue * scale + 0.5f).toInt()
   }
 }
+// test
