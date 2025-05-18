@@ -1,7 +1,11 @@
 plugins {
     id 'com.android.library'
     id 'kotlin-android'
+    id 'maven-publish'
 }
+
+group = 'digital.stratosphere.callacamera'
+version = '4.0.0'
 
 android {
     compileSdkVersion rootProject.ext.versionCompiler
@@ -40,4 +44,17 @@ dependencies {
 
     implementation project(path: ':libuvc')
     api project(path: ':libnative')
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                groupId = 'digital.stratosphere.callacamera'
+                artifactId = 'libausbc'
+                version = '4.0.0'
+            }
+        }
+    }
 }
