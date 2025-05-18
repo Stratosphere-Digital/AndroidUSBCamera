@@ -1,6 +1,7 @@
 package com.jiangdg.ausbc.utils
 
 import android.Manifest
+import android.os.Build
 import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.usb.UsbConstants
