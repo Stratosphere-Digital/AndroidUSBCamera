@@ -240,7 +240,7 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
         mSaveImageExecutor.submit {
             if (! CameraUtils.hasStoragePermission(ctx)) {
                 mMainHandler.post {
-                    callback.onError("have no storage permission")
+                    callback.onError("No storage permission")
                 }
                 Logger.e(TAG,"open camera failed, have no storage permission")
                 return@submit

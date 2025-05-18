@@ -6,7 +6,7 @@ plugins {
 import org.apache.tools.ant.taskdefs.condition.Os
 
 group = 'digital.stratosphere.callacamera'
-version = '4.0.0'
+version = rootProject.ext.versionNameString
 
 android {
 	compileSdkVersion rootProject.ext.versionCompiler
@@ -86,7 +86,7 @@ afterEvaluate {
                 from components.release
                 groupId = 'digital.stratosphere.callacamera'
                 artifactId = 'libuvc'
-                version = '4.0.0'
+                version = rootProject.ext.versionNameString
             }
         }
     }
