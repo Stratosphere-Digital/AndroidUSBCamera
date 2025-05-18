@@ -11,3 +11,4 @@
 .tags*
 .cxx/
 .vscode
+libuvc/src/main/libs/**/*.so
