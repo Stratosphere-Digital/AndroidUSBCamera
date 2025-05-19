@@ -128,139 +128,146 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
             postStateEvent(ICameraStateCallBack.State.ERROR, "Usb control block can not be null ")
             return
         }
-        Logger.d(TAG, "1. Create UVCCamera")
-        // 1. create a UVCCamera
-        val request = mCameraRequest!!
-        try {
-            mUvcCamera = UVCCamera().apply {
-                open(mCtrlBlock)
-            }
-        } catch (e: Exception) {
-            closeCamera()
-            postStateEvent(ICameraStateCallBack.State.ERROR, "open camera failed ${e.localizedMessage}")
-            Logger.e(TAG, "open camera failed.", e)
-        }
 
-        Logger.d(TAG, "2. Set preview size and register preview callback")
-        // 2. set preview size and register preview callback
-        var previewSize = getSuitableSize(request.previewWidth, request.previewHeight).apply {
-            mCameraRequest!!.previewWidth = width
-            mCameraRequest!!.previewHeight = height
-        }
-        val previewFormat = if (mCameraRequest?.previewFormat == CameraRequest.PreviewFormat.FORMAT_YUYV) {
-            UVCCamera.FRAME_FORMAT_YUYV
-        } else {
-            UVCCamera.FRAME_FORMAT_MJPEG
-        }
         try {
-            Logger.i(TAG, "getSuitableSize: $previewSize")
-            if (! isPreviewSizeSupported(previewSize)) {
+            Logger.d(TAG, "1. Create UVCCamera")
+            val request = mCameraRequest!!
+            try {
+                mUvcCamera = UVCCamera().apply {
+                    open(mCtrlBlock)
+                }
+            } catch (e: Exception) {
                 closeCamera()
-                postStateEvent(ICameraStateCallBack.State.ERROR, "unsupported preview size")
-                Logger.e(TAG, "open camera failed, preview size($previewSize) unsupported-> ${mUvcCamera?.supportedSizeList}")
+                postStateEvent(ICameraStateCallBack.State.ERROR, "open camera failed ${e.localizedMessage}")
+                Logger.e(TAG, "Open camera failed", e)
                 return
             }
-            initEncodeProcessor(previewSize.width, previewSize.height)
-            // if give custom minFps or maxFps or unsupported preview size
-            // this method will fail
-            mUvcCamera?.setPreviewSize(
-                previewSize.width,
-                previewSize.height,
-                MIN_FS,
-                MAX_FPS,
-                previewFormat,
-                UVCCamera.DEFAULT_BANDWIDTH
-            )
-        } catch (e: Exception) {
+
+            Logger.d(TAG, "2. Set preview size and register preview callback")
+            var previewSize = getSuitableSize(request.previewWidth, request.previewHeight).apply {
+                mCameraRequest!!.previewWidth = width
+                mCameraRequest!!.previewHeight = height
+            }
+            val previewFormat = if (mCameraRequest?.previewFormat == CameraRequest.PreviewFormat.FORMAT_YUYV) {
+                UVCCamera.FRAME_FORMAT_YUYV
+            } else {
+                UVCCamera.FRAME_FORMAT_MJPEG
+            }
             try {
-                previewSize = getSuitableSize(request.previewWidth, request.previewHeight).apply {
-                    mCameraRequest!!.previewWidth = width
-                    mCameraRequest!!.previewHeight = height
-                }
+                Logger.i(TAG, "getSuitableSize: $previewSize")
                 if (! isPreviewSizeSupported(previewSize)) {
-                    postStateEvent(ICameraStateCallBack.State.ERROR, "unsupported preview size")
                     closeCamera()
-                    Logger.e(TAG, "open camera failed, preview size($previewSize) unsupported-> ${mUvcCamera?.supportedSizeList}")
+                    postStateEvent(ICameraStateCallBack.State.ERROR, "unsupported preview size")
+                    Logger.e(TAG, "Open camera failed: preview size($previewSize) unsupported-> ${mUvcCamera?.supportedSizeList}")
                     return
                 }
-                Logger.e(TAG, " setPreviewSize failed(format is $previewFormat), try to use other format...")
+                initEncodeProcessor(previewSize.width, previewSize.height)
+                // if give custom minFps or maxFps or unsupported preview size
+                // this method will fail
                 mUvcCamera?.setPreviewSize(
                     previewSize.width,
                     previewSize.height,
                     MIN_FS,
                     MAX_FPS,
-                    if (previewFormat == UVCCamera.FRAME_FORMAT_YUYV) {
-                        UVCCamera.FRAME_FORMAT_MJPEG
-                    } else {
-                        UVCCamera.FRAME_FORMAT_YUYV
-                    },
+                    previewFormat,
                     UVCCamera.DEFAULT_BANDWIDTH
                 )
             } catch (e: Exception) {
-                closeCamera()
-                postStateEvent(ICameraStateCallBack.State.ERROR, "err: ${e.localizedMessage}")
-                Logger.e(TAG, " setPreviewSize failed, even using yuv format", e)
-                return
-            }
-        }
-        // if not opengl render or opengl render with preview callback
-        // there should opened
-        if (! isNeedGLESRender || mCameraRequest!!.isRawPreviewData || mCameraRequest!!.isCaptureRawImage) {
-            mUvcCamera?.setFrameCallback(frameCallBack, UVCCamera.PIXEL_FORMAT_YUV420SP)
-        }
-        // 3. start preview
-        when(cameraView) {
-            is Surface -> {
-                Logger.d(TAG, "4. Surface")
-                mUvcCamera?.setPreviewDisplay(cameraView)
-            }
-            is SurfaceTexture -> {
                 try {
-                    Logger.d(TAG, "4. SurfaceTexture")
-                    mUvcCamera?.setPreviewTexture(cameraView)
+                    previewSize = getSuitableSize(request.previewWidth, request.previewHeight).apply {
+                        mCameraRequest!!.previewWidth = width
+                        mCameraRequest!!.previewHeight = height
+                    }
+                    if (! isPreviewSizeSupported(previewSize)) {
+                        postStateEvent(ICameraStateCallBack.State.ERROR, "unsupported preview size")
+                        closeCamera()
+                        Logger.e(TAG, "open camera failed, preview size($previewSize) unsupported-> ${mUvcCamera?.supportedSizeList}")
+                        return
+                    }
+                    Logger.e(TAG, " setPreviewSize failed(format is $previewFormat), try to use other format...")
+                    mUvcCamera?.setPreviewSize(
+                        previewSize.width,
+                        previewSize.height,
+                        MIN_FS,
+                        MAX_FPS,
+                        if (previewFormat == UVCCamera.FRAME_FORMAT_YUYV) {
+                            UVCCamera.FRAME_FORMAT_MJPEG
+                        } else {
+                            UVCCamera.FRAME_FORMAT_YUYV
+                        },
+                        UVCCamera.DEFAULT_BANDWIDTH
+                    )
                 } catch (e: Exception) {
                     closeCamera()
-                    postStateEvent(ICameraStateCallBack.State.ERROR, "Failed to set preview texture: ${e.message}")
-                    Logger.e(TAG, "Failed to set preview texture", e)
+                    postStateEvent(ICameraStateCallBack.State.ERROR, "err: ${e.localizedMessage}")
+                    Logger.e(TAG, " setPreviewSize failed, even using yuv format", e)
                     return
                 }
             }
-            is SurfaceView -> {
-                if (cameraView.holder == null) {
+            // if not opengl render or opengl render with preview callback
+            // there should opened
+            if (! isNeedGLESRender || mCameraRequest!!.isRawPreviewData || mCameraRequest!!.isCaptureRawImage) {
+                mUvcCamera?.setFrameCallback(frameCallBack, UVCCamera.PIXEL_FORMAT_YUV420SP)
+            }
+            // 3. start preview
+            when(cameraView) {
+                is Surface -> {
+                    Logger.d(TAG, "3. Start preview: Surface")
+                    mUvcCamera?.setPreviewDisplay(cameraView)
+                }
+                is SurfaceTexture -> {
+                    try {
+                        Logger.d(TAG, "3. Start preview: SurfaceTexture")
+                        mUvcCamera?.setPreviewTexture(cameraView)
+                    } catch (e: Exception) {
+                        closeCamera()
+                        postStateEvent(ICameraStateCallBack.State.ERROR, "Failed to set preview texture: ${e.message}")
+                        Logger.e(TAG, "Failed to set preview texture", e)
+                        return
+                    }
+                }
+                is SurfaceView -> {
+                    if (cameraView.holder == null) {
+                        closeCamera()
+                        postStateEvent(ICameraStateCallBack.State.ERROR, "SurfaceView holder is null")
+                        Logger.e(TAG, "SurfaceView holder is null")
+                        return
+                    }
+                    Logger.d(TAG, "3. Start preview: SurfaceView")
+                    mUvcCamera?.setPreviewDisplay(cameraView.holder)
+                }
+                is TextureView -> {
+                    val surfaceTexture = cameraView.surfaceTexture
+                    if (surfaceTexture == null) {
+                        closeCamera()
+                        postStateEvent(ICameraStateCallBack.State.ERROR, "TextureView's SurfaceTexture is null")
+                        Logger.e(TAG, "TextureView's SurfaceTexture is null")
+                        return
+                    }
+                    Logger.d(TAG, "3. Start preview: TextureView")
+                    mUvcCamera?.setPreviewTexture(surfaceTexture)
+                }
+                else -> {
                     closeCamera()
-                    postStateEvent(ICameraStateCallBack.State.ERROR, "SurfaceView holder is null")
-                    Logger.e(TAG, "SurfaceView holder is null")
+                    postStateEvent(ICameraStateCallBack.State.ERROR, "Unsupported camera view type: $cameraView")
+                    Logger.e(TAG, "3. Unsupported camera view type: $cameraView")
                     return
                 }
-                Logger.d(TAG, "4. SurfaceView")
-                mUvcCamera?.setPreviewDisplay(cameraView.holder)
             }
-            is TextureView -> {
-                val surfaceTexture = cameraView.surfaceTexture
-                if (surfaceTexture == null) {
-                    closeCamera()
-                    postStateEvent(ICameraStateCallBack.State.ERROR, "TextureView's SurfaceTexture is null")
-                    Logger.e(TAG, "TextureView's SurfaceTexture is null")
-                    return
-                }
-                Logger.d(TAG, "4a. TextureView")
-                mUvcCamera?.setPreviewTexture(surfaceTexture)
+            mUvcCamera?.autoFocus = true
+            mUvcCamera?.autoWhiteBlance = true
+            mUvcCamera?.startPreview()
+            mUvcCamera?.updateCameraParams()
+            isPreviewed = true
+            postStateEvent(ICameraStateCallBack.State.OPENED)
+            if (Utils.debugCamera) {
+                Logger.i(TAG, " start preview, name = ${device.deviceName}, preview=$previewSize")
             }
-            else -> {
-                closeCamera()
-                postStateEvent(ICameraStateCallBack.State.ERROR, "Unsupported camera view type: $cameraView")
-                Logger.e(TAG, "4. Unsupported camera view type: $cameraView")
-                return
-            }
-        }
-        mUvcCamera?.autoFocus = true
-        mUvcCamera?.autoWhiteBlance = true
-        mUvcCamera?.startPreview()
-        mUvcCamera?.updateCameraParams()
-        isPreviewed = true
-        postStateEvent(ICameraStateCallBack.State.OPENED)
-        if (Utils.debugCamera) {
-            Logger.i(TAG, " start preview, name = ${device.deviceName}, preview=$previewSize")
+        } catch (e: Exception) {
+            closeCamera()
+            postStateEvent(ICameraStateCallBack.State.ERROR, "Error initializing camera: ${e.message}")
+            Logger.e(TAG, "Error initializing camera", e)
+            return
         }
     }
 
