@@ -833,45 +833,50 @@ class MultiCameraClient(ctx: Context, callback: IDeviceConnectCallBack?) {
         }
 
         fun getSuitableSize(maxWidth: Int, maxHeight: Int): PreviewSize {
-            val sizeList = getAllPreviewSizes()
-            if (sizeList.isNullOrEmpty()) {
+            try {
+                val sizeList = getAllPreviewSizes()
+                if (sizeList.isNullOrEmpty()) {
+                    return PreviewSize(DEFAULT_PREVIEW_WIDTH, DEFAULT_PREVIEW_HEIGHT)
+                }
+                // find it
+                sizeList.find {
+                    (it.width == maxWidth && it.height == maxHeight)
+                }.also { size ->
+                    size ?: return@also
+                    return size
+                }
+                // find the same aspectRatio
+                val aspectRatio = maxWidth.toFloat() / maxHeight
+                sizeList.find {
+                    val w = it.width
+                    val h = it.height
+                    val ratio = w.toFloat() / h
+                    ratio == aspectRatio && w <= maxWidth && h <= maxHeight
+                }.also { size ->
+                    size ?: return@also
+                    return size
+                }
+                // find the closest aspectRatio
+                var minDistance: Int = maxWidth
+                var closetSize = sizeList[0]
+                sizeList.forEach { size ->
+                    if (minDistance >= abs((maxWidth - size.width))) {
+                        minDistance = abs(maxWidth - size.width)
+                        closetSize = size
+                    }
+                }
+                // use default
+                sizeList.find {
+                    (it.width == DEFAULT_PREVIEW_WIDTH || it.height == DEFAULT_PREVIEW_HEIGHT)
+                }.also { size ->
+                    size ?: return@also
+                    return size
+                }
+                return closetSize
+            } catch (e: Exception) {
+                Logger.e(TAG, "Failed to get suitable size", e)
                 return PreviewSize(DEFAULT_PREVIEW_WIDTH, DEFAULT_PREVIEW_HEIGHT)
             }
-            // find it
-            sizeList.find {
-                (it.width == maxWidth && it.height == maxHeight)
-            }.also { size ->
-                size ?: return@also
-                return size
-            }
-            // find the same aspectRatio
-            val aspectRatio = maxWidth.toFloat() / maxHeight
-            sizeList.find {
-                val w = it.width
-                val h = it.height
-                val ratio = w.toFloat() / h
-                ratio == aspectRatio && w <= maxWidth && h <= maxHeight
-            }.also { size ->
-                size ?: return@also
-                return size
-            }
-            // find the closest aspectRatio
-            var minDistance: Int = maxWidth
-            var closetSize = sizeList[0]
-            sizeList.forEach { size ->
-                if (minDistance >= abs((maxWidth - size.width))) {
-                    minDistance = abs(maxWidth - size.width)
-                    closetSize = size
-                }
-            }
-            // use default
-            sizeList.find {
-                (it.width == DEFAULT_PREVIEW_WIDTH || it.height == DEFAULT_PREVIEW_HEIGHT)
-            }.also { size ->
-                size ?: return@also
-                return size
-            }
-            return closetSize
         }
 
         fun isPreviewSizeSupported(previewSize: PreviewSize): Boolean {

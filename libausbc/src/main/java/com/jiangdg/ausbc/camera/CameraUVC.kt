@@ -51,57 +51,67 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
     }
 
     private val frameCallBack = IFrameCallback { frame ->
-        frame?.apply {
-            frame.position(0)
-            val data = ByteArray(capacity())
-            get(data)
-            mCameraRequest?.apply {
-                if (data.size != previewWidth * previewHeight * 3 / 2) {
-                    return@IFrameCallback
+        try {
+            frame?.apply {
+                frame.position(0)
+                val data = ByteArray(capacity())
+                get(data)
+                mCameraRequest?.apply {
+                    if (data.size != previewWidth * previewHeight * 3 / 2) {
+                        return@IFrameCallback
+                    }
+                    // for preview callback
+                    mPreviewDataCbList.forEach { cb ->
+                        cb?.onPreviewData(data, previewWidth, previewHeight, IPreviewDataCallBack.DataFormat.NV21)
+                    }
+                    // for image
+                    if (mNV21DataQueue.size >= MAX_NV21_DATA) {
+                        mNV21DataQueue.removeLast()
+                    }
+                    mNV21DataQueue.offerFirst(data)
+                    // for video
+                    // avoid preview size changed
+                    putVideoData(data)
                 }
-                // for preview callback
-                mPreviewDataCbList.forEach { cb ->
-                    cb?.onPreviewData(data, previewWidth, previewHeight, IPreviewDataCallBack.DataFormat.NV21)
-                }
-                // for image
-                if (mNV21DataQueue.size >= MAX_NV21_DATA) {
-                    mNV21DataQueue.removeLast()
-                }
-                mNV21DataQueue.offerFirst(data)
-                // for video
-                // avoid preview size changed
-                putVideoData(data)
             }
+        } catch (e: Exception) {
+            Logger.e(TAG, "Error processing frame", e)
         }
     }
 
     override fun getAllPreviewSizes(aspectRatio: Double?): MutableList<PreviewSize> {
         val previewSizeList = arrayListOf<PreviewSize>()
-        val isMjpegFormat = mCameraRequest?.previewFormat == CameraRequest.PreviewFormat.FORMAT_MJPEG
-        if (isMjpegFormat && (mUvcCamera?.supportedSizeList?.isNotEmpty() == true)) {
-            mUvcCamera?.supportedSizeList
-        }  else {
-            mUvcCamera?.getSupportedSizeList(UVCCamera.FRAME_FORMAT_YUYV)
-        }?.let { sizeList ->
-            if (sizeList.size > mCameraPreviewSize.size) {
-                mCameraPreviewSize.clear()
-                sizeList.forEach { size->
-                    val width = size.width
-                    val height = size.height
-                    mCameraPreviewSize.add(PreviewSize(width, height))
+        try {
+            val isMjpegFormat = mCameraRequest?.previewFormat == CameraRequest.PreviewFormat.FORMAT_MJPEG
+            if (isMjpegFormat && (mUvcCamera?.supportedSizeList?.isNotEmpty() == true)) {
+                mUvcCamera?.supportedSizeList
+            } else {
+                mUvcCamera?.getSupportedSizeList(UVCCamera.FRAME_FORMAT_YUYV)
+            }?.let { sizeList ->
+                if (sizeList.size > mCameraPreviewSize.size) {
+                    mCameraPreviewSize.clear()
+                    sizeList.forEach { size->
+                        val width = size.width
+                        val height = size.height
+                        mCameraPreviewSize.add(PreviewSize(width, height))
+                    }
+                }
+                if (Utils.debugCamera) {
+                    Logger.i(TAG, "aspect ratio = $aspectRatio, supportedSizeList = $sizeList")
+                }
+                mCameraPreviewSize
+            }?.onEach { size ->
+                val width = size.width
+                val height = size.height
+                val ratio = width.toDouble() / height
+                if (aspectRatio == null || aspectRatio == ratio) {
+                    previewSizeList.add(PreviewSize(width, height))
                 }
             }
-            if (Utils.debugCamera) {
-                Logger.i(TAG, "aspect ratio = $aspectRatio, supportedSizeList = $sizeList")
-            }
-            mCameraPreviewSize
-        }?.onEach { size ->
-            val width = size.width
-            val height = size.height
-            val ratio = width.toDouble() / height
-            if (aspectRatio == null || aspectRatio == ratio) {
-                previewSizeList.add(PreviewSize(width, height))
-            }
+        } catch (e: Exception) {
+            Logger.e(TAG, "Failed to get preview sizes", e)
+            // Return default size as fallback
+            return mutableListOf(PreviewSize(DEFAULT_PREVIEW_WIDTH, DEFAULT_PREVIEW_HEIGHT))
         }
         return previewSizeList
     }
@@ -118,6 +128,7 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
             postStateEvent(ICameraStateCallBack.State.ERROR, "Usb control block can not be null ")
             return
         }
+        Logger.d(TAG, "1. Create UVCCamera")
         // 1. create a UVCCamera
         val request = mCameraRequest!!
         try {
@@ -130,6 +141,7 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
             Logger.e(TAG, "open camera failed.", e)
         }
 
+        Logger.d(TAG, "2. Set preview size and register preview callback")
         // 2. set preview size and register preview callback
         var previewSize = getSuitableSize(request.previewWidth, request.previewHeight).apply {
             mCameraRequest!!.previewWidth = width
@@ -199,19 +211,46 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
         // 3. start preview
         when(cameraView) {
             is Surface -> {
+                Logger.d(TAG, "4. Surface")
                 mUvcCamera?.setPreviewDisplay(cameraView)
             }
             is SurfaceTexture -> {
-                mUvcCamera?.setPreviewTexture(cameraView)
+                try {
+                    Logger.d(TAG, "4. SurfaceTexture")
+                    mUvcCamera?.setPreviewTexture(cameraView)
+                } catch (e: Exception) {
+                    closeCamera()
+                    postStateEvent(ICameraStateCallBack.State.ERROR, "Failed to set preview texture: ${e.message}")
+                    Logger.e(TAG, "Failed to set preview texture", e)
+                    return
+                }
             }
             is SurfaceView -> {
+                if (cameraView.holder == null) {
+                    closeCamera()
+                    postStateEvent(ICameraStateCallBack.State.ERROR, "SurfaceView holder is null")
+                    Logger.e(TAG, "SurfaceView holder is null")
+                    return
+                }
+                Logger.d(TAG, "4. SurfaceView")
                 mUvcCamera?.setPreviewDisplay(cameraView.holder)
             }
             is TextureView -> {
-                mUvcCamera?.setPreviewTexture(cameraView.surfaceTexture)
+                val surfaceTexture = cameraView.surfaceTexture
+                if (surfaceTexture == null) {
+                    closeCamera()
+                    postStateEvent(ICameraStateCallBack.State.ERROR, "TextureView's SurfaceTexture is null")
+                    Logger.e(TAG, "TextureView's SurfaceTexture is null")
+                    return
+                }
+                Logger.d(TAG, "4a. TextureView")
+                mUvcCamera?.setPreviewTexture(surfaceTexture)
             }
             else -> {
-                throw IllegalStateException("Only support Surface or SurfaceTexture or SurfaceView or TextureView or GLSurfaceView--$cameraView")
+                closeCamera()
+                postStateEvent(ICameraStateCallBack.State.ERROR, "Unsupported camera view type: $cameraView")
+                Logger.e(TAG, "4. Unsupported camera view type: $cameraView")
+                return
             }
         }
         mUvcCamera?.autoFocus = true
@@ -226,74 +265,88 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
     }
 
     override fun closeCameraInternal() {
-        postStateEvent(ICameraStateCallBack.State.CLOSED)
-        isPreviewed = false
-        releaseEncodeProcessor()
-        mUvcCamera?.destroy()
-        mUvcCamera = null
-        if (Utils.debugCamera) {
-            Logger.i(TAG, " stop preview, name = ${device.deviceName}")
+        try {
+            postStateEvent(ICameraStateCallBack.State.CLOSED)
+            isPreviewed = false
+            releaseEncodeProcessor()
+            mUvcCamera?.destroy()
+            mUvcCamera = null
+            if (Utils.debugCamera) {
+                Logger.i(TAG, " stop preview, name = ${device.deviceName}")
+            }
+        } catch (e: Exception) {
+            Logger.e(TAG, "Error closing camera", e)
+            // Ensure camera is null even if destroy fails
+            mUvcCamera = null
+            isPreviewed = false
         }
     }
 
     override fun captureImageInternal(savePath: String?, callback: ICaptureCallBack) {
         mSaveImageExecutor.submit {
-            if (! CameraUtils.hasStoragePermission(ctx)) {
-                mMainHandler.post {
-                    callback.onError("No storage permission")
+            try {
+                if (! CameraUtils.hasStoragePermission(ctx)) {
+                    mMainHandler.post {
+                        callback.onError("No storage permission")
+                    }
+                    Logger.e(TAG,"open camera failed, have no storage permission")
+                    return@submit
                 }
-                Logger.e(TAG,"open camera failed, have no storage permission")
-                return@submit
-            }
-            if (! isPreviewed) {
-                mMainHandler.post {
-                    callback.onError("camera not previewing")
+                if (! isPreviewed) {
+                    mMainHandler.post {
+                        callback.onError("camera not previewing")
+                    }
+                    Logger.i(TAG, "captureImageInternal failed, camera not previewing")
+                    return@submit
                 }
-                Logger.i(TAG, "captureImageInternal failed, camera not previewing")
-                return@submit
-            }
-            val data = mNV21DataQueue.pollFirst(CAPTURE_TIMES_OUT_SEC, TimeUnit.SECONDS)
-            if (data == null) {
-                mMainHandler.post {
-                    callback.onError("Times out")
-                }
-                Logger.i(TAG, "captureImageInternal failed, times out.")
-                return@submit
-            }
-            mMainHandler.post {
-                callback.onBegin()
-            }
-            val date = mDateFormat.format(System.currentTimeMillis())
-            val title = savePath ?: "IMG_AUSBC_$date"
-            val displayName = savePath ?: "$title.jpg"
-            val path = savePath ?: "$mCameraDir/$displayName"
-            val location = Utils.getGpsLocation(ctx)
-            val width = mCameraRequest!!.previewWidth
-            val height = mCameraRequest!!.previewHeight
-            val ret = MediaUtils.saveYuv2Jpeg(path, data, width, height)
-            if (! ret) {
-                val file = File(path)
-                if (file.exists()) {
-                    file.delete()
+                val data = mNV21DataQueue.pollFirst(CAPTURE_TIMES_OUT_SEC, TimeUnit.SECONDS)
+                if (data == null) {
+                    mMainHandler.post {
+                        callback.onError("Times out")
+                    }
+                    Logger.i(TAG, "captureImageInternal failed, times out.")
+                    return@submit
                 }
                 mMainHandler.post {
-                    callback.onError("save yuv to jpeg failed.")
+                    callback.onBegin()
                 }
-                Logger.w(TAG, "save yuv to jpeg failed.")
-                return@submit
+                val date = mDateFormat.format(System.currentTimeMillis())
+                val title = savePath ?: "IMG_AUSBC_$date"
+                val displayName = savePath ?: "$title.jpg"
+                val path = savePath ?: "$mCameraDir/$displayName"
+                val location = Utils.getGpsLocation(ctx)
+                val width = mCameraRequest!!.previewWidth
+                val height = mCameraRequest!!.previewHeight
+                val ret = MediaUtils.saveYuv2Jpeg(path, data, width, height)
+                if (! ret) {
+                    val file = File(path)
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                    mMainHandler.post {
+                        callback.onError("save yuv to jpeg failed.")
+                    }
+                    Logger.w(TAG, "save yuv to jpeg failed.")
+                    return@submit
+                }
+                val values = ContentValues()
+                values.put(MediaStore.Images.ImageColumns.TITLE, title)
+                values.put(MediaStore.Images.ImageColumns.DISPLAY_NAME, displayName)
+                values.put(MediaStore.Images.ImageColumns.DATA, path)
+                values.put(MediaStore.Images.ImageColumns.DATE_TAKEN, date)
+                values.put(MediaStore.Images.ImageColumns.LONGITUDE, location?.longitude)
+                values.put(MediaStore.Images.ImageColumns.LATITUDE, location?.latitude)
+                ctx.contentResolver?.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                mMainHandler.post {
+                    callback.onComplete(path)
+                }
+                if (Utils.debugCamera) { Logger.i(TAG, "captureImageInternal save path = $path") }
+            } catch (e: Exception) {
+                Logger.e(TAG, "Error capturing image", e)
+                mMainHandler.post {
+                    callback.onError("Failed to capture image: ${e.message}")
+                }
             }
-            val values = ContentValues()
-            values.put(MediaStore.Images.ImageColumns.TITLE, title)
-            values.put(MediaStore.Images.ImageColumns.DISPLAY_NAME, displayName)
-            values.put(MediaStore.Images.ImageColumns.DATA, path)
-            values.put(MediaStore.Images.ImageColumns.DATE_TAKEN, date)
-            values.put(MediaStore.Images.ImageColumns.LONGITUDE, location?.longitude)
-            values.put(MediaStore.Images.ImageColumns.LATITUDE, location?.latitude)
-            ctx.contentResolver?.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-            mMainHandler.post {
-                callback.onComplete(path)
-            }
-            if (Utils.debugCamera) { Logger.i(TAG, "captureImageInternal save path = $path") }
         }
     }
 
