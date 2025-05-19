@@ -49,6 +49,9 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
     private val mCameraPreviewSize by lazy {
         arrayListOf<PreviewSize>()
     }
+    private var frameListener: SurfaceTexture.OnFrameAvailableListener? = null
+    private var validFrameReceived = false
+    private val frameCheckThreshold = 5
 
     private val frameCallBack = IFrameCallback { frame ->
         try {
@@ -60,6 +63,16 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
                     if (data.size != previewWidth * previewHeight * 3 / 2) {
                         return@IFrameCallback
                     }
+
+                    if (!validFrameReceived) {
+                        val isValidFrame = isFrameValid(data, previewWidth, previewHeight)
+                        if (isValidFrame) {
+                            validFrameReceived = true
+                            postStateEvent(ICameraStateCallBack.State.OPENED)
+                            frameListener = null
+                        }
+                    }
+
                     // for preview callback
                     mPreviewDataCbList.forEach { cb ->
                         cb?.onPreviewData(data, previewWidth, previewHeight, IPreviewDataCallBack.DataFormat.NV21)
@@ -77,6 +90,28 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
         } catch (e: Exception) {
             Logger.e(TAG, "Error processing frame", e)
         }
+    }
+
+    private fun isFrameValid(data: ByteArray, width: Int, height: Int): Boolean {
+        // Check if frame is not completely black or empty
+        // NV21 format: Y plane followed by interleaved VU plane
+        val yPlaneSize = width * height
+        var nonZeroPixels = 0
+        var totalPixels = 0
+        
+        // Sample pixels from the Y plane (luminance)
+        for (i in 0 until yPlaneSize step 10) {  // Sample every 10th pixel for performance
+            if (data[i].toInt() and 0xFF > 10) {  // Check if pixel is not black (threshold of 10)
+                nonZeroPixels++
+            }
+            totalPixels++
+        }
+        
+        // Calculate percentage of non-black pixels
+        val nonBlackPercentage = (nonZeroPixels.toFloat() / totalPixels) * 100
+        
+        Logger.d(TAG, "Frame validity check: $nonBlackPercentage% non-black pixels")
+        return nonBlackPercentage > 5  // Consider frame valid if more than 5% of pixels are non-black
     }
 
     override fun getAllPreviewSizes(aspectRatio: Double?): MutableList<PreviewSize> {
@@ -204,12 +239,27 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
                     return
                 }
             }
+
             // if not opengl render or opengl render with preview callback
             // there should opened
+
             if (! isNeedGLESRender || mCameraRequest!!.isRawPreviewData || mCameraRequest!!.isCaptureRawImage) {
                 mUvcCamera?.setFrameCallback(frameCallBack, UVCCamera.PIXEL_FORMAT_YUV420SP)
+            } else {
+                Logger.w(TAG, "No frameCallback has been set - using OpenGL")
             }
+
             // 3. start preview
+
+            postStateEvent(ICameraStateCallBack.State.PREVIEW_STARTING)
+            validFrameReceived = false
+
+            frameListener = SurfaceTexture.OnFrameAvailableListener { 
+                // postStateEvent(ICameraStateCallBack.State.OPENED)
+                Logger.d(TAG, "Surface texture frame available, waiting for valid frame data...")
+                frameListener = null
+            }
+
             when(cameraView) {
                 is Surface -> {
                     Logger.d(TAG, "3. Start preview: Surface")
@@ -218,10 +268,12 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
                 is SurfaceTexture -> {
                     try {
                         Logger.d(TAG, "3. Start preview: SurfaceTexture")
+                        cameraView.setDefaultBufferSize(previewSize.width, previewSize.height)
+                        cameraView.setOnFrameAvailableListener(frameListener)
                         mUvcCamera?.setPreviewTexture(cameraView)
                     } catch (e: Exception) {
                         closeCamera()
-                        postStateEvent(ICameraStateCallBack.State.ERROR, "Failed to set preview texture: ${e.message}")
+                        postStateEvent(ICameraStateCallBack.State.PREVIEW_ERROR, "Failed to set preview texture: ${e.message}")
                         Logger.e(TAG, "Failed to set preview texture", e)
                         return
                     }
@@ -229,7 +281,7 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
                 is SurfaceView -> {
                     if (cameraView.holder == null) {
                         closeCamera()
-                        postStateEvent(ICameraStateCallBack.State.ERROR, "SurfaceView holder is null")
+                        postStateEvent(ICameraStateCallBack.State.PREVIEW_ERROR, "SurfaceView holder is null")
                         Logger.e(TAG, "SurfaceView holder is null")
                         return
                     }
@@ -240,16 +292,20 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
                     val surfaceTexture = cameraView.surfaceTexture
                     if (surfaceTexture == null) {
                         closeCamera()
-                        postStateEvent(ICameraStateCallBack.State.ERROR, "TextureView's SurfaceTexture is null")
+                        postStateEvent(ICameraStateCallBack.State.PREVIEW_ERROR, "TextureView's SurfaceTexture is null")
                         Logger.e(TAG, "TextureView's SurfaceTexture is null")
                         return
                     }
                     Logger.d(TAG, "3. Start preview: TextureView")
+                    Logger.d(TAG, "TextureView size: ${cameraView.width}x${cameraView.height}")
+                    Logger.d(TAG, "Setting buffer size to: ${previewSize.width}x${previewSize.height}")
+                    surfaceTexture.setDefaultBufferSize(previewSize.width, previewSize.height)
+                    surfaceTexture.setOnFrameAvailableListener(frameListener)
                     mUvcCamera?.setPreviewTexture(surfaceTexture)
                 }
                 else -> {
                     closeCamera()
-                    postStateEvent(ICameraStateCallBack.State.ERROR, "Unsupported camera view type: $cameraView")
+                    postStateEvent(ICameraStateCallBack.State.PREVIEW_ERROR, "Unsupported camera view type: $cameraView")
                     Logger.e(TAG, "3. Unsupported camera view type: $cameraView")
                     return
                 }
@@ -258,11 +314,27 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
             mUvcCamera?.autoWhiteBlance = true
             mUvcCamera?.startPreview()
             mUvcCamera?.updateCameraParams()
-            isPreviewed = true
+            
+
             postStateEvent(ICameraStateCallBack.State.OPENED)
+            isPreviewed = true
             if (Utils.debugCamera) {
                 Logger.i(TAG, " start preview, name = ${device.deviceName}, preview=$previewSize")
             }
+
+
+            // Only set isPreviewed to true after we've confirmed frames are being received
+            /*
+            if (validFrameReceived) {
+                isPreviewed = true
+                if (Utils.debugCamera) {
+                    Logger.i(TAG, " start preview, name = ${device.deviceName}, preview=$previewSize")
+                }
+            } else {
+                Logger.w(TAG, "Preview started but no valid frames received yet")
+            }
+            */
+
         } catch (e: Exception) {
             closeCamera()
             postStateEvent(ICameraStateCallBack.State.ERROR, "Error initializing camera: ${e.message}")

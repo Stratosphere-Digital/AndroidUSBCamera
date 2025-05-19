@@ -25,6 +25,6 @@ interface ICameraStateCallBack {
     fun onCameraState(self: MultiCameraClient.ICamera, code: State, msg: String? = null)
 
     enum class State {
-        OPENED, CLOSED, ERROR
+        OPENED, CLOSED, ERROR, PREVIEW_STARTING, PREVIEW_ERROR
     }
 }

@@ -173,12 +173,14 @@ abstract class CameraFragment : BaseFragment(), ICameraStateCallBack {
     protected fun getDeviceList() = mCameraClient?.getDeviceList()
 
     private fun handleTextureView(textureView: TextureView) {
+        Logger.d(TAG, "Setting up TextureView with size: ${textureView.width}x${textureView.height}")
         textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(
                 surface: SurfaceTexture?,
                 width: Int,
                 height: Int
             ) {
+                Logger.d(TAG, "SurfaceTexture available with size: ${width}x${height}")
                 registerMultiCamera()
             }
 
@@ -187,15 +189,18 @@ abstract class CameraFragment : BaseFragment(), ICameraStateCallBack {
                 width: Int,
                 height: Int
             ) {
+                Logger.d(TAG, "SurfaceTexture size changed to: ${width}x${height}")
                 surfaceSizeChanged(width, height)
             }
 
             override fun onSurfaceTextureDestroyed(surface: SurfaceTexture?): Boolean {
+                Logger.d(TAG, "SurfaceTexture destroyed")
                 unRegisterMultiCamera()
                 return false
             }
 
             override fun onSurfaceTextureUpdated(surface: SurfaceTexture?) {
+                Logger.d(TAG, "SurfaceTexture updated")
             }
         }
     }

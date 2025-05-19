@@ -294,67 +294,73 @@ class MultiCameraClient(ctx: Context, callback: IDeviceConnectCallBack?) {
         override fun handleMessage(msg: Message): Boolean {
             when (msg.what) {
                 MSG_START_PREVIEW -> {
-                    val previewWidth = mCameraRequest!!.previewWidth
-                    val previewHeight = mCameraRequest!!.previewHeight
-                    val renderMode = mCameraRequest!!.renderMode
-                    val isRawPreviewData = mCameraRequest!!.isRawPreviewData
-                    when (val cameraView = mCameraView) {
-                        is IAspectRatio -> {
-                            if (mCameraRequest!!.isAspectRatioShow) {
-                                cameraView.setAspectRatio(previewWidth, previewHeight)
-                            }
-                            cameraView
-                        }
-                        else -> {
-                            null
-                        }
-                    }.also { view->
-                        isNeedGLESRender = isGLESRender(renderMode == CameraRequest.RenderMode.OPENGL)
-                        if (! isNeedGLESRender && view != null) {
-                            openCameraInternal(view)
-                            return true
-                        }
-                        // use opengl render
-                        // if surface is null, force off screen render whatever mode
-                        // and use init preview size（measure size） for render size
-                        val measureSize = try {
-                            mSizeChangedFuture = SettableFuture()
-                            mSizeChangedFuture?.get(2000, TimeUnit.MILLISECONDS)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                            null
-                        }
-                        Logger.i(TAG, "surface measure size $measureSize")
-                        mCameraRequest!!.renderMode = CameraRequest.RenderMode.OPENGL
-                        val screenWidth = view?.getSurfaceWidth() ?: previewWidth
-                        val screenHeight = view?.getSurfaceHeight() ?: previewHeight
-                        val surface = view?.getSurface()
-                        val previewCb = if (isRawPreviewData) {
-                            null
-                        } else {
-                            mPreviewDataCbList
-                        }
-                        mRenderManager = RenderManager(ctx, previewWidth, previewHeight, previewCb)
-                        mRenderManager?.startRenderScreen(screenWidth, screenHeight, surface, object : RenderManager.CameraSurfaceTextureListener {
-                            override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture?) {
-                                if (surfaceTexture == null) {
-                                    closeCamera()
-                                    postStateEvent(ICameraStateCallBack.State.ERROR, "create camera surface failed")
-                                    return
+                    try {
+                        val previewWidth = mCameraRequest!!.previewWidth
+                        val previewHeight = mCameraRequest!!.previewHeight
+                        val renderMode = mCameraRequest!!.renderMode
+                        val isRawPreviewData = mCameraRequest!!.isRawPreviewData
+                        when (val cameraView = mCameraView) {
+                            is IAspectRatio -> {
+                                if (mCameraRequest!!.isAspectRatioShow) {
+                                    cameraView.setAspectRatio(previewWidth, previewHeight)
                                 }
-                                openCameraInternal(surfaceTexture)
+                                cameraView
                             }
-                        })
-                        mRenderManager?.setRotateType(mCameraRequest!!.defaultRotateType)
-                        if (mCacheEffectList.isNotEmpty()) {
-                            mCacheEffectList.forEach { effect ->
-                                mRenderManager?.addRenderEffect(effect)
+                            else -> {
+                                null
                             }
-                            return@also
+                        }.also { view->
+                            isNeedGLESRender = isGLESRender(renderMode == CameraRequest.RenderMode.OPENGL)
+                            if (! isNeedGLESRender && view != null) {
+                                openCameraInternal(view)
+                                return true
+                            }
+                            // use opengl render
+                            // if surface is null, force off screen render whatever mode
+                            // and use init preview size（measure size） for render size
+                            val measureSize = try {
+                                mSizeChangedFuture = SettableFuture()
+                                mSizeChangedFuture?.get(2000, TimeUnit.MILLISECONDS)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                null
+                            }
+                            Logger.i(TAG, "surface measure size $measureSize")
+                            mCameraRequest!!.renderMode = CameraRequest.RenderMode.OPENGL
+                            val screenWidth = view?.getSurfaceWidth() ?: previewWidth
+                            val screenHeight = view?.getSurfaceHeight() ?: previewHeight
+                            val surface = view?.getSurface()
+                            val previewCb = if (isRawPreviewData) {
+                                null
+                            } else {
+                                mPreviewDataCbList
+                            }
+                            mRenderManager = RenderManager(ctx, previewWidth, previewHeight, previewCb)
+                            mRenderManager?.startRenderScreen(screenWidth, screenHeight, surface, object : RenderManager.CameraSurfaceTextureListener {
+                                override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture?) {
+                                    if (surfaceTexture == null) {
+                                        closeCamera()
+                                        postStateEvent(ICameraStateCallBack.State.ERROR, "create camera surface failed")
+                                        return
+                                    }
+                                    openCameraInternal(surfaceTexture)
+                                }
+                            })
+                            mRenderManager?.setRotateType(mCameraRequest!!.defaultRotateType)
+                            if (mCacheEffectList.isNotEmpty()) {
+                                mCacheEffectList.forEach { effect ->
+                                    mRenderManager?.addRenderEffect(effect)
+                                }
+                                return@also
+                            }
+                            mCameraRequest?.defaultEffect?.apply {
+                                mRenderManager?.addRenderEffect(this)
+                            }
                         }
-                        mCameraRequest?.defaultEffect?.apply {
-                            mRenderManager?.addRenderEffect(this)
-                        }
+                    } catch (e: Exception) {
+                        Logger.e(TAG, "Error in handleMessage MSG_START_PREVIEW", e)
+                        postStateEvent(ICameraStateCallBack.State.PREVIEW_ERROR, "Failed to start preview: ${e.message}")
+                        return true
                     }
                 }
                 MSG_STOP_PREVIEW -> {

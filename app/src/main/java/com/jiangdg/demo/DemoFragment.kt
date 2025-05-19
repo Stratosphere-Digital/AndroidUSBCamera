@@ -242,7 +242,21 @@ class DemoFragment : CameraFragment(), View.OnClickListener, CaptureMediaView.On
             ICameraStateCallBack.State.OPENED -> handleCameraOpened()
             ICameraStateCallBack.State.CLOSED -> handleCameraClosed()
             ICameraStateCallBack.State.ERROR -> handleCameraError(msg)
+            ICameraStateCallBack.State.PREVIEW_STARTING -> handlePreviewStarting()
+            ICameraStateCallBack.State.PREVIEW_ERROR -> handlePreviewError(msg)
         }
+    }
+
+    private fun handlePreviewStarting() {
+        mViewBinding.uvcLogoIv.visibility = View.VISIBLE
+        mViewBinding.frameRateTv.visibility = View.GONE
+        ToastUtils.show("oreview starting")
+    }
+
+    private fun handlePreviewError(msg: String?) {
+        mViewBinding.uvcLogoIv.visibility = View.VISIBLE
+        mViewBinding.frameRateTv.visibility = View.GONE
+        ToastUtils.show("preview error: $msg")
     }
 
     private fun handleCameraError(msg: String?) {
