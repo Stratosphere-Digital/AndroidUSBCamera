@@ -583,5 +583,7 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
         private const val TAG = "CameraUVC"
         private const val MIN_FS = 1
         private const val MAX_FPS = 61
+        private const val DEFAULT_PREVIEW_WIDTH = 640
+        private const val DEFAULT_PREVIEW_HEIGHT = 480
     }
 }
