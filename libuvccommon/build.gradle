@@ -1,4 +1,8 @@
-apply plugin: 'com.android.library'
+plugins {
+    id 'com.android.library'
+    id 'maven-publish'
+}
+
 /*
  * libcommon
  * utility/helper classes for myself
@@ -17,6 +21,9 @@ apply plugin: 'com.android.library'
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
 */
+
+group = 'digital.stratosphere.callacamera'
+version = rootProject.ext.versionNameString
 
 android {
     compileSdkVersion rootProject.ext.versionCompiler
@@ -50,4 +57,17 @@ dependencies {
 	implementation "androidx.appcompat:appcompat:1.0.2"
 	implementation "androidx.recyclerview:recyclerview:1.0.0"
 	implementation "androidx.preference:preference:1.0.0"
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                groupId = 'digital.stratosphere.callacamera'
+                artifactId = 'libuvccommon'
+                version = rootProject.ext.versionNameString
+            }
+        }
+    }
 }

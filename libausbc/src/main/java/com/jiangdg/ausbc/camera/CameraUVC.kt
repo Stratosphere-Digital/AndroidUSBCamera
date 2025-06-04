@@ -513,6 +513,58 @@ class CameraUVC(ctx: Context, device: UsbDevice) : MultiCameraClient.ICamera(ctx
         mUvcCamera?.resetHue()
     }
 
+    /**
+     * Set hardware button callback for detecting physical shutter button presses
+     *
+     * @param callback button callback interface
+     */
+    fun setButtonCallback(callback: com.jiangdg.uvc.IButtonCallback?) {
+        mUvcCamera?.setButtonCallback(callback)
+    }
+
+    /**
+     * Set hardware button callback for detecting physical shutter button presses (wrapper interface)
+     *
+     * @param callback button callback interface
+     */
+    fun setHardwareButtonCallback(callback: com.jiangdg.ausbc.callback.IHardwareButtonCallback?) {
+        if (callback != null) {
+            setButtonCallback(object : com.jiangdg.uvc.IButtonCallback {
+                override fun onButton(button: Int, state: Int) {
+                    callback.onButton(button, state)
+                }
+            })
+        } else {
+            setButtonCallback(null)
+        }
+    }
+
+    /**
+     * Set status callback for monitoring hardware status changes
+     *
+     * @param callback status callback interface
+     */
+    fun setStatusCallback(callback: com.jiangdg.uvc.IStatusCallback?) {
+        mUvcCamera?.setStatusCallback(callback)
+    }
+
+    /**
+     * Set status callback for monitoring hardware status changes (wrapper interface)
+     *
+     * @param callback status callback interface
+     */
+    fun setHardwareStatusCallback(callback: com.jiangdg.ausbc.callback.IHardwareStatusCallback?) {
+        if (callback != null) {
+            setStatusCallback(object : com.jiangdg.uvc.IStatusCallback {
+                override fun onStatus(statusClass: Int, event: Int, selector: Int, statusAttribute: Int, data: java.nio.ByteBuffer?) {
+                    callback.onStatus(statusClass, event, selector, statusAttribute, data)
+                }
+            })
+        } else {
+            setStatusCallback(null)
+        }
+    }
+
     companion object {
         private const val TAG = "CameraUVC"
         private const val MIN_FS = 10
