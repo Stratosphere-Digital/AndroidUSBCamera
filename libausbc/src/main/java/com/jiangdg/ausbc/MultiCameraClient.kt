@@ -445,11 +445,10 @@ class MultiCameraClient(ctx: Context, callback: IDeviceConnectCallBack?) {
                 mAudioProcess = processor
             }
             // create video process
-            mContext.resources.configuration.orientation.let { orientation ->
-                orientation == Configuration.ORIENTATION_PORTRAIT
-            }.also { isPortrait ->
-                mVideoProcess = H264EncodeProcessor(previewWidth, previewHeight, isNeedGLESRender, isPortrait)
-            }
+            // IMPORTANT: Disable portrait rotation as it causes video corruption
+            // The rotation logic in H264EncodeProcessor has bugs that corrupt the video frames
+            // Always use landscape orientation (isPortrait = false) for USB camera video
+            mVideoProcess = H264EncodeProcessor(previewWidth, previewHeight, isNeedGLESRender, false)
         }
 
         /**
